@@ -78,6 +78,66 @@ This tells Claude that:
 2. The tool returns a dictionary with detailed disk information
 3. The docstring explains what each field means
 
+### Communication Protocol
+
+Unlike traditional REST APIs, MCP uses a bidirectional JSON-RPC protocol over WebSocket. Here's how it works:
+
+1. **Initialization**:
+   ```json
+   // Claude -> Server
+   {
+     "jsonrpc": "2.0",
+     "method": "initialize",
+     "params": {
+       "protocolVersion": "2024-11-05",
+       "capabilities": {},
+       "clientInfo": {
+         "name": "claude-ai",
+         "version": "0.1.0"
+       }
+     },
+     "id": 0
+   }
+   ```
+
+2. **Tool Advertisement**:
+   The server responds with its capabilities, including the `get_disk_usage` tool and its schema.
+
+3. **Tool Invocation**:
+   ```json
+   // Claude -> Server
+   {
+     "jsonrpc": "2.0",
+     "method": "invoke",
+     "params": {
+       "tool": "get_disk_usage",
+       "args": {}
+     },
+     "id": 1
+   }
+   ```
+
+4. **Server Response**:
+   ```json
+   // Server -> Claude
+   {
+     "jsonrpc": "2.0",
+     "result": {
+       "device": "/dev/disk3s5",
+       "total_gb": "228.0GB",
+       "used_gb": "177.0GB",
+       ...
+     },
+     "id": 1
+   }
+   ```
+
+This WebSocket-based protocol allows for:
+- Persistent connections
+- Bidirectional communication
+- Structured type information
+- Tool discovery and documentation
+
 ### Implementation
 
 1. The MCP server (`disk_usage_server.py`) uses Python's `subprocess` module to run the `df` command
