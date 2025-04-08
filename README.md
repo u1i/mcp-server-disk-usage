@@ -80,9 +80,183 @@ This tells Claude that:
 2. The tool returns a dictionary with detailed disk information
 3. The docstring explains what each field means
 
+### The Complete Claude-MCP Interaction Flow
+
+1. **Initial System Prompt to Claude**:
+```
+You are Claude, an AI assistant. You have access to these tools:
+
+get_disk_usage() -> Dict[str, str]
+    "Get current disk usage information for the system disk"
+
+To use this tool, respond with a <tool_call> XML block:
+<tool_call>
+<name>get_disk_usage</name>
+<reason>Explain why you need disk usage information</reason>
+</tool_call>
+```
+
+2. **User Query**:
+```
+User: What is my current disk usage?
+```
+
+3. **Claude's Tool Selection Response**:
+```
+I'll check your disk usage information.
+
+<tool_call>
+<name>get_disk_usage</name>
+<reason>User has requested current disk usage information. This tool will provide detailed statistics about disk space utilization.</reason>
+</tool_call>
+```
+
+4. **Claude Desktop App → MCP Server**:
+```json
+// HTTP POST to MCP Server
+{
+    "jsonrpc": "2.0",
+    "method": "invoke",
+    "params": {
+        "tool": "get_disk_usage",
+        "args": {}
+    },
+    "id": 1
+}
+```
+
+5. **MCP Server → Claude Desktop App**:
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "device": "/dev/disk3s5",
+        "total_gb": "228.0GB",
+        "used_gb": "177.0GB",
+        "available_gb": "27.0GB",
+        "reserved_gb": "24.0GB",
+        "percent_used": "87%",
+        "mount": "/System/Volumes/Data",
+        "summary": "Total: 228.0GB | Used: 177.0GB | Available: 27.0GB | Reserved: 24.0GB | Usage: 87%"
+    },
+    "id": 1
+}
+```
+
+6. **New Request to Claude** (with tool output as context):
+```
+User: What is my current disk usage?
+
+Tool Response:
+{
+    "device": "/dev/disk3s5",
+    "total_gb": "228.0GB",
+    "used_gb": "177.0GB",
+    "available_gb": "27.0GB",
+    "reserved_gb": "24.0GB",
+    "percent_used": "87%",
+    "mount": "/System/Volumes/Data",
+    "summary": "Total: 228.0GB | Used: 177.0GB | Available: 27.0GB | Reserved: 24.0GB | Usage: 87%"
+}
+
+Provide a helpful response to the user based on this disk usage information.
+```
+
+7. **Claude's Final Response**:
+```
+Here's your current disk usage information:
+
+Total Disk Space: 228.0GB   
+Used Space: 177.0GB   
+Available Space: 27.0GB   
+Reserved Space: 24.0GB   
+Usage Percentage: 87%   
+Mount Point: /System/Volumes/Data   
+Device: /dev/disk3s5
+
+Your disk is currently at 87% capacity, with 27.0GB of space still available. If you're concerned about the high usage, you might want to consider cleaning up some files to free up more space.
+```
+
+This shows the complete flow:
+1. Claude starts with knowledge of available tools
+2. User asks a question
+3. Claude recognizes the need for disk info and proposes using the tool
+4. After approval, tool response is injected into the conversation
+5. Claude processes the raw data into a helpful response
+
+### Technical Implementation
+   ```python
+   # Tool advertisement from server
+   {
+     "tools": [
+       {
+         "name": "get_disk_usage",
+         "description": "Get current disk usage information for the system disk",
+         "parameters": {},  # No parameters needed
+         "returns": {
+           "type": "object",
+           "properties": {
+             "device": {"type": "string"},
+             "total_gb": {"type": "string"},
+             "used_gb": {"type": "string"},
+             "available_gb": {"type": "string"},
+             "reserved_gb": {"type": "string"},
+             "percent_used": {"type": "string"},
+             "mount": {"type": "string"},
+             "summary": {"type": "string"}
+           }
+         }
+       }
+     ]
+   }
+   ```
+
+2. **User Query**:
+   ```
+   User: "What is my current disk usage?"
+   ```
+
+3. **Claude's Tool Selection**:
+   Claude recognizes this query requires disk information and decides to use the `get_disk_usage` tool.
+   ```
+   Claude: "Let me check your current disk usage for you."
+   [approval to use disk-usage tool, user gives consent]
+   ```
+
+4. **Tool Invocation and Response**:
+   ```json
+   // Raw tool response
+   {
+     "device": "/dev/disk3s5",
+     "total_gb": "228.0GB",
+     "used_gb": "177.0GB",
+     "available_gb": "27.0GB",
+     "reserved_gb": "24.0GB",
+     "percent_used": "87%",
+     "mount": "/System/Volumes/Data",
+     "summary": "Total: 228.0GB | Used: 177.0GB | Available: 27.0GB | Reserved: 24.0GB | Usage: 87%"
+   }
+   ```
+
+5. **Claude's Natural Response**:
+   Claude processes the raw data and provides a human-friendly response:
+   ```
+   Here's your current disk usage information:
+
+   Total Disk Space: 228.0GB   
+   Used Space: 177.0GB   
+   Available Space: 27.0GB   
+   Reserved Space: 24.0GB   
+   Usage Percentage: 87%   
+   Mount Point: /System/Volumes/Data   
+   Device: /dev/disk3s5
+
+   Your disk is currently at 87% capacity, with 27.0GB of space still available. If you're concerned about the high usage, you might want to consider cleaning up some files to free up more space."
+   ```
+
 ### Communication Protocol
 
-Unlike traditional REST APIs, MCP uses a bidirectional JSON-RPC protocol over WebSocket. Here's how it works:
+Under the hood, MCP uses a bidirectional JSON-RPC protocol over WebSocket. Here's how it works:
 
 1. **Initialization**:
    ```json
