@@ -50,6 +50,36 @@ Your disk is currently at 87% capacity, with 27.0GB of space still available. If
 
 ## How It Works
 
+### Server Capabilities
+
+When the server starts, it advertises its capabilities to Claude through the MCP protocol. Here's what Claude sees:
+
+```python
+@mcp.tool()
+def get_disk_usage() -> Dict[str, str]:
+    """Get current disk usage information for the system disk
+    
+    Returns:
+        A dictionary containing disk usage information with fields:
+        - device: Device name
+        - total_gb: Total size in GB
+        - used_gb: Used space in GB
+        - available_gb: Available space in GB
+        - reserved_gb: Space reserved by system in GB
+        - percent_used: Usage percentage
+        - mount: Mount point
+        - summary: Human-readable summary of disk usage
+    """
+```
+
+This tells Claude that:
+
+1. The server provides a tool called `get_disk_usage`
+2. The tool returns a dictionary with detailed disk information
+3. The docstring explains what each field means
+
+### Implementation
+
 1. The MCP server (`disk_usage_server.py`) uses Python's `subprocess` module to run the `df` command
 2. It specifically looks at the `/System/Volumes/Data` partition (disk3s5 on macOS)
 3. The server parses the output and returns structured data including:
