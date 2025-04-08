@@ -13,6 +13,8 @@ Learn more about MCP:
 
 When integrated with Claude Desktop, this demo MCP server enables Claude to check your disk usage (on the Mac) in real-time. Here's an example interaction:
 
+![](usage.png)
+
 User: "What is my current disk usage?"
 
 Claude: "Let me check your current disk usage for you."
